@@ -7,12 +7,22 @@
 //
 
 #import <UIKit/UIKit.h>
+#import "DownloadManager.h"
 
 #define kDownloadProgressNotification @"downloadProgressNotification"
+
+@protocol HandleEventsForBackgroundDelegate <NSObject>
+
+- (void)handleEventsForBackgroundURLSession:(NSString *)identifier completionHandler:(void (^)())completionHandler;
+
+@end
 
 @interface AppDelegate : UIResponder <UIApplicationDelegate>
 
 @property (strong, nonatomic) UIWindow *window;
+@property (strong, nonatomic) DownloadManager *downloadManager;
+
+@property (nonatomic,weak)id<HandleEventsForBackgroundDelegate> HEFBdelegate;
 
 - (void)beginDownloadWithUrl:(NSString *)downloadURLString;
 - (void)pauseDownload;

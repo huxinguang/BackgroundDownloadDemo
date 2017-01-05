@@ -26,11 +26,23 @@ typedef void(^CompletionHandlerType)();
 
 @implementation AppDelegate
 
+- (void)createCacheDirectory
+{
+    NSFileManager *fileManager = [NSFileManager defaultManager];
+    if (![fileManager fileExistsAtPath:HSCachesDirectory]) {
+        [fileManager createDirectoryAtPath:HSCachesDirectory withIntermediateDirectories:YES attributes:nil error:NULL];
+    }
+    NSLog(@"%@",HSCachesDirectory);
+}
+
 - (BOOL)application:(UIApplication *)application didFinishLaunchingWithOptions:(NSDictionary *)launchOptions {
     // Override point for customization after application launch.
     self.completionHandlerDictionary = @{}.mutableCopy;
-    self.backgroundSession = [self backgroundURLSession];
     
+//    [self createCacheDirectory];
+//    
+//    self.backgroundSession = [self backgroundURLSession];
+//    
 
     [self initLocalNotification];
     // ios8后，需要添加这个注册，才能得到授权
@@ -63,6 +75,13 @@ typedef void(^CompletionHandlerType)();
     
     // 保存 completion handler 以在处理 session 事件后更新 UI
     [self addCompletionHandler:completionHandler forSession:identifier];
+    
+    
+//    if ([self.HEFBdelegate respondsToSelector:@selector(handleEventsForBackgroundURLSession:completionHandler:)]) {
+//        [self.HEFBdelegate handleEventsForBackgroundURLSession:identifier completionHandler:completionHandler];
+//    }
+    
+
 }
 
 #pragma mark Save completionHandler
@@ -160,15 +179,29 @@ typedef void(^CompletionHandlerType)();
 }
 
 - (void)continueDownload {
-    if (self.resumeData) {
-        if (IS_IOS10ORLATER) {
-            self.downloadTask = [self.backgroundSession downloadTaskWithCorrectResumeData:self.resumeData];
-        } else {
-            self.downloadTask = [self.backgroundSession downloadTaskWithResumeData:self.resumeData];
+//    if (self.resumeData) {
+    
+        
+//        if (IS_IOS10ORLATER) {
+//            self.downloadTask = [self.backgroundSession downloadTaskWithCorrectResumeData:self.resumeData];
+//        } else {
+//            self.downloadTask = [self.backgroundSession downloadTaskWithResumeData:self.resumeData];
+//        }
+//        NSURL *downloadURL = [NSURL URLWithString:@"http://120.25.226.186:32812/resources/videos/minion_01.mp4"];
+//        NSURLRequest *request = [NSURLRequest requestWithURL:downloadURL];
+//        self.downloadTask = [self.backgroundSession downloadTaskWithRequest:request];
+        
+        NSString *urlStr = @"http://120.25.226.186:32812/resources/videos/minion_01.mp4";
+        NSString *plistPath = [HSCachesDirectory stringByAppendingPathComponent:@"resumeData.plist"];
+        NSMutableDictionary *plistDic = [NSMutableDictionary dictionaryWithContentsOfFile:plistPath];
+        if (plistDic && [plistDic objectForKey:urlStr]) {
+            NSData *resumeData = [plistDic objectForKey:urlStr];
+            self.downloadTask = [self.backgroundSession downloadTaskWithResumeData:resumeData];
         }
+    
         [self.downloadTask resume];
         self.resumeData = nil;
-    }
+//    }
 }
 
 - (BOOL)isValideResumeData:(NSData *)resumeData
@@ -186,14 +219,21 @@ didFinishDownloadingToURL:(NSURL *)location {
     
     NSLog(@"downloadTask:%lu didFinishDownloadingToURL:%@", (unsigned long)downloadTask.taskIdentifier, location);
     NSString *locationString = [location path];
-    NSString *finalLocation = [[NSSearchPathForDirectoriesInDomains(NSDocumentDirectory , NSUserDomainMask, YES) lastObject] stringByAppendingPathComponent:[NSString stringWithFormat:@"%lufile",(unsigned long)downloadTask.taskIdentifier]];
-    NSError *error;
-    [[NSFileManager defaultManager] moveItemAtPath:locationString toPath:finalLocation error:&error];
     
+//    NSString *finalLocation = [[NSSearchPathForDirectoriesInDomains(NSDocumentDirectory , NSUserDomainMask, YES) lastObject] stringByAppendingPathComponent:[NSString stringWithFormat:@"%lufile",(unsigned long)downloadTask.taskIdentifier]];
+//    NSError *error;
+//    [[NSFileManager defaultManager] moveItemAtPath:locationString toPath:finalLocation error:&error];
+//    
     // 用 NSFileManager 将文件复制到应用的存储中
     // ...
     
     // 通知 UI 刷新
+    
+    NSString *urlStr = downloadTask.currentRequest.URL.absoluteString;
+    NSString *destinationPath = [HSCachesDirectory stringByAppendingPathComponent:[urlStr lastPathComponent]];
+    NSError *error;
+    [[NSFileManager defaultManager] moveItemAtPath:locationString toPath:destinationPath error:&error];
+    
 }
 
 - (void)URLSession:(NSURLSession *)session
@@ -233,14 +273,37 @@ totalBytesExpectedToWrite:(int64_t)totalBytesExpectedToWrite {
               task:(NSURLSessionTask *)task
 didCompleteWithError:(NSError *)error {
     
+    NSString *plistPath = [HSCachesDirectory stringByAppendingPathComponent:@"resumeData.plist"];
+    NSMutableDictionary *plistDic = [NSMutableDictionary dictionaryWithContentsOfFile:plistPath];
+    NSString *urlStr = task.currentRequest.URL.absoluteString;
+    NSLog(@"***************%@",urlStr.length>0?urlStr:@"task的url为空");
+    NSLog(@"%@",plistPath);
+
     if (error) {
         // check if resume data are available
         if ([error.userInfo objectForKey:NSURLSessionDownloadTaskResumeData]) {
             NSData *resumeData = [error.userInfo objectForKey:NSURLSessionDownloadTaskResumeData];
             //通过之前保存的resumeData，获取断点的NSURLSessionTask，调用resume恢复下载
-            self.resumeData = resumeData;
+//            self.resumeData = resumeData;
+            
+            if (plistDic) {
+                [plistDic setObject:resumeData forKey:urlStr];
+                [plistDic writeToFile:plistPath atomically:YES];
+            }else{
+                NSMutableDictionary *dict = [NSMutableDictionary dictionary];
+                [dict setObject:resumeData forKey:urlStr];
+                [dict writeToFile:plistPath atomically:YES];
+            }
+            
         }
     } else {
+    
+        if (plistDic && [plistDic objectForKey:urlStr]) {
+            [plistDic removeObjectForKey:urlStr];
+            [plistDic writeToFile:plistPath atomically:YES];
+
+        }
+        
         [self sendLocalNotification];
         [self postDownlaodProgressNotification:@"1"];
     }

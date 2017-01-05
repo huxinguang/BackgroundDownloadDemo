@@ -8,6 +8,8 @@
 
 #import "ViewController.h"
 #import "AppDelegate.h"
+#import "DownloadViewController.h"
+#import "MultiDownloadViewController.h"
 
 @interface ViewController ()
 
@@ -45,7 +47,7 @@
 - (IBAction)download:(id)sender {
     AppDelegate *delegate = (AppDelegate *)[[UIApplication sharedApplication] delegate];
     //http://sw.bos.baidu.com/sw-search-sp/software/797b4439e2551/QQ_mac_5.0.2.dmg
-    [delegate beginDownloadWithUrl:@"http://118.187.35.34:8889/test.rmvb"];
+    [delegate beginDownloadWithUrl:@"http://120.25.226.186:32812/resources/videos/minion_01.mp4"];
 }
 
 - (IBAction)pauseDownlaod:(id)sender {
@@ -56,6 +58,11 @@
 - (IBAction)continueDownlaod:(id)sender {
     AppDelegate *delegate = (AppDelegate *)[[UIApplication sharedApplication] delegate];
     [delegate continueDownload];
+}
+- (IBAction)btnAction:(id)sender {
+//    DownloadViewController *dvc = [[DownloadViewController alloc]init];
+    MultiDownloadViewController *dvc = [[MultiDownloadViewController alloc]init];
+    [self.navigationController pushViewController:dvc animated:YES];
 }
 
 @end
